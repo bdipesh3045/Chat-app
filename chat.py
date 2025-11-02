@@ -152,3 +152,146 @@ def home():
     return {"message": "Welcome to the AI Warm-up Assistant API!"}
 
 
+def coach_mem(player_name, daily: Dict, weekly: Dict):
+    data=f"""
+    ### 🧍 Player Details
+    **Name:** {player_name}
+    ### 📅 Today's Metrics
+    - Pain: {daily.get('knee_pain', 'N/A')}/10
+    - Fatigue: {daily.get('leg_freshness', 'N/A')}/10
+    - Stability: {daily.get('stability', 'N/A')}/10
+    - Sleep: {daily.get('sleep_hours', 'N/A')}h
+    - Warm-up: {'Done' if daily.get('warmup_done') else 'Skipped'}
+    - Mobility: {'Stiff' if daily.get('mobility_stiffness') else 'Good'}
+
+    ---
+
+    ### 🗓️ 7-Day Weekly Trends
+    - Avg Pain: {weekly.get('avg_pain', 'N/A')}
+    - Avg Sleep: {weekly.get('avg_sleep', 'N/A')}
+    - Avg Freshness: {weekly.get('avg_freshness', 'N/A')}
+    - Avg Intensity: {weekly.get('avg_intensity', 'N/A')}
+    - Warm-up Compliance: {weekly.get('warmup_rate', 0)*100:.0f}%
+    - Days with Stiffness: {weekly.get('stiff_days', 'N/A')}
+
+    ---
+
+    """
+    return data
+
+def build_acl_summary_prompt(player_name, daily: Dict, weekly: Dict):
+    """
+    Build a complete ACL status summary prompt for the AI coach assistant.
+    Uses daily and weekly data only.
+
+    Args:
+        player_name (str): Player name.
+        daily (dict): Today's metrics.
+        weekly (dict): 7-day averages/trends.
+
+    Returns:
+        str: formatted prompt string for the LLM.
+    """
+
+    # Debug log
+    print("Daily data:", daily)
+    print("Weekly data:", weekly)
+
+    prompt = f"""
+You are an assistant for a strength and conditioning coach.
+Summarize this player's ACL-related status clearly and briefly.
+
+---
+
+### 🧍 Player Details
+**Name:** {player_name}
+
+---
+
+### 📅 Today's Metrics
+- Pain: {daily.get('knee_pain', 'N/A')}/10
+- Fatigue: {daily.get('leg_freshness', 'N/A')}/10
+- Stability: {daily.get('stability', 'N/A')}/10
+- Sleep: {daily.get('sleep_hours', 'N/A')}h
+- Warm-up: {'Done' if daily.get('warmup_done') else 'Skipped'}
+- Mobility: {'Stiff' if daily.get('mobility_stiffness') else 'Good'}
+
+---
+
+### 🗓️ 7-Day Weekly Trends
+- Avg Pain: {weekly.get('avg_pain', 'N/A')}
+- Avg Sleep: {weekly.get('avg_sleep', 'N/A')}
+- Avg Freshness: {weekly.get('avg_freshness', 'N/A')}
+- Avg Intensity: {weekly.get('avg_intensity', 'N/A')}
+- Warm-up Compliance: {weekly.get('warmup_rate', 0)*100:.0f}%
+- Days with Stiffness: {weekly.get('stiff_days', 'N/A')}
+
+---
+
+### 🧠 What to Provide
+Most important thing store everything in memory for future reference and make the summary as brief as possible no yapping
+1️⃣ **ACL Risk Level** (Low / Moderate / High)  
+2️⃣ **2 Key Observations** (patterns or risk signals)  
+3️⃣ **2–3 Actionable Coaching Recommendations** (e.g., adjust load, mobility drills)  
+4️⃣ **Weekly Trend Summary** — risk trend (Improving / Stable / Worsening)  
+6️⃣ **ACL Susceptibility Score (1–100)** — rate current injury risk.  
+7.Make a brief report -> No yapping 
+
+
+    """
+    print("Prompt built successfully ✅")
+    return prompt
+
+
+
+
+
+# --------------------------
+# 📊 Coach ACL Summary Endpoint
+# --------------------------
+class CoachRequest(BaseModel):
+    coach_name: str
+    player_name: str
+    daily: Dict
+    weekly: Dict
+    mode : str
+    input:str
+
+@app.post("/coach")
+def coach_summary_endpoint(request: CoachRequest):
+    """
+    Generate an ACL summary report for a player (for coach view).
+    """
+    try:
+        session = get_chain(request.coach_name)
+        llm = session["llm"]
+        if request.mode=="chat":
+            prompt_text=f"{request.input} Player details: {coach_mem(
+                player_name=request.player_name,
+                daily=request.daily,
+                weekly=request.weekly
+            )}"
+        # 🧠 Build AI prompt
+        else:
+            prompt_text = build_acl_summary_prompt(
+                player_name=request.player_name,
+                daily=request.daily,
+                weekly=request.weekly
+            )
+
+        # 🔮 Call Gemini
+        response = llm.invoke(prompt_text)
+        summary = response.content
+
+        # Optionally store in session history
+        session["history"].append(HumanMessage(content=f"Summarize ACL for {request.player_name}"))
+        session["history"].append(AIMessage(content=summary))
+
+        return {
+            "player_name": request.player_name,
+            "coach": request.coach_name,
+            "summary": summary
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
