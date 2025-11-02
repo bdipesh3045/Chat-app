@@ -20,8 +20,8 @@ user_sessions = {}
 # --------------------------
 # 🧠 Prompt builder
 # --------------------------
-def prompt_return(data, height, weight, age, training_type, experience_level, limitations):
-    if data == "exercise" or data!=None:
+def prompt_return(data, height, weight,gender, age, training_type, experience_level, limitations):
+    if data == "exercise":
         print("Prompt works")
         return f"""
 You are a certified strength and conditioning coach and physiotherapist who specializes in safe and effective warm-up design.
@@ -39,6 +39,7 @@ The warm-up must:
 Height: {height} cm  
 Weight: {weight} kg  
 Age: {age}  
+Gender : {gender}
 Training Type: {training_type}  
 Experience Level: {experience_level}  
 Limitations: {limitations}
@@ -95,8 +96,9 @@ def chat(username: str, user_input: str, input_params: Dict):
         output_param="You are a coach bot who will help people to guide about acl injury"
     else:
     # 🧠 Use dynamic user parameters
+        print("else")
         output_param = prompt_return(**input_params)
-    print(output_param)
+    print(output_param,"hello")
     # Build the chat prompt
     prompt = ChatPromptTemplate.from_messages([
         ("system", f"You are a friendly and knowledgeable AI assistant. Be concise but helpful.{output_param}"),
