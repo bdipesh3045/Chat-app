@@ -179,27 +179,52 @@ def coach_mem(player_name, daily: Dict, weekly: Dict):
     """
     return data
 
+def coach_mem(player_name, daily: Dict, weekly: Dict):
+    data = f"""
+    ### 🧍 Player Details
+    **Name:** {player_name}
+
+    ### 📅 Today's Metrics
+    - Knee Pain: {daily.get('kneePain', 'N/A')}/10
+    - Leg Freshness: {daily.get('legFreshness', 'N/A')}/10
+    - Sleep Hours: {daily.get('sleepHours', 'N/A')}h
+    - Training Intensity: {daily.get('trainingIntensity', 'N/A')}/10
+    - ACL Injury Score: {daily.get('aclInjuryScore', 'N/A')}/100
+    - Stiffness Level: {daily.get('stiffnessLevel', 'N/A')}/10
+    - Calorie Intake: {daily.get('calorieIntake', 'N/A')} kcal
+
+    ---
+
+    ### 🗓️ 7-Day Weekly Summary
+    - Avg Knee Pain: {weekly.get('avg_pain', 'N/A')}
+    - Avg Freshness: {weekly.get('avg_freshness', 'N/A')}
+    - Avg Sleep: {weekly.get('avg_sleep', 'N/A')}
+    - Avg Intensity: {weekly.get('avg_intensity', 'N/A')}
+    - Avg ACL Risk: {weekly.get('avg_risk', 'N/A')}
+    - Days with Stiffness: {weekly.get('stiff_days', 'N/A')}
+    - Avg Calories: {weekly.get('avg_calories', 'N/A')}
+
+    ---
+    """
+    return data
+
+
 def build_acl_summary_prompt(player_name, daily: Dict, weekly: Dict):
     """
     Build a complete ACL status summary prompt for the AI coach assistant.
-    Uses daily and weekly data only.
-
-    Args:
-        player_name (str): Player name.
-        daily (dict): Today's metrics.
-        weekly (dict): 7-day averages/trends.
-
-    Returns:
-        str: formatted prompt string for the LLM.
+    Uses updated player parameters for ACL assessment.
     """
 
-    # Debug log
     print("Daily data:", daily)
     print("Weekly data:", weekly)
 
     prompt = f"""
 You are an assistant for a strength and conditioning coach.
-Summarize this player's ACL-related status clearly and briefly.
+Your job is to analyze this player's condition and decide whether to focus 
+on daily readiness or weekly recovery trends based on their data.
+
+Be concise, structured, and avoid unnecessary text ("no yapping").
+Store all insights in memory for future reference.
 
 ---
 
@@ -209,39 +234,44 @@ Summarize this player's ACL-related status clearly and briefly.
 ---
 
 ### 📅 Today's Metrics
-- Pain: {daily.get('knee_pain', 'N/A')}/10
-- Fatigue: {daily.get('leg_freshness', 'N/A')}/10
-- Stability: {daily.get('stability', 'N/A')}/10
-- Sleep: {daily.get('sleep_hours', 'N/A')}h
-- Warm-up: {'Done' if daily.get('warmup_done') else 'Skipped'}
-- Mobility: {'Stiff' if daily.get('mobility_stiffness') else 'Good'}
+- Knee Pain: {daily.get('kneePain', 'N/A')}/10
+- Leg Freshness: {daily.get('legFreshness', 'N/A')}/10
+- Sleep Hours: {daily.get('sleepHours', 'N/A')}h
+- Training Intensity: {daily.get('trainingIntensity', 'N/A')}/10
+- ACL Injury Score: {daily.get('aclInjuryScore', 'N/A')}/100
+- Stiffness Level: {daily.get('stiffnessLevel', 'N/A')}/10
+- Calorie Intake: {daily.get('calorieIntake', 'N/A')} kcal
 
 ---
 
-### 🗓️ 7-Day Weekly Trends
+### 🗓️ 7-Day Weekly Summary
 - Avg Pain: {weekly.get('avg_pain', 'N/A')}
-- Avg Sleep: {weekly.get('avg_sleep', 'N/A')}
 - Avg Freshness: {weekly.get('avg_freshness', 'N/A')}
+- Avg Sleep: {weekly.get('avg_sleep', 'N/A')}
 - Avg Intensity: {weekly.get('avg_intensity', 'N/A')}
-- Warm-up Compliance: {weekly.get('warmup_rate', 0)*100:.0f}%
+- Avg ACL Risk: {weekly.get('avg_risk', 'N/A')}
 - Days with Stiffness: {weekly.get('stiff_days', 'N/A')}
+- Avg Calories: {weekly.get('avg_calories', 'N/A')}
 
 ---
 
 ### 🧠 What to Provide
-Most important thing store everything in memory for future reference and make the summary as brief as possible no yapping
-1️⃣ **ACL Risk Level** (Low / Moderate / High)  
-2️⃣ **2 Key Observations** (patterns or risk signals)  
-3️⃣ **2–3 Actionable Coaching Recommendations** (e.g., adjust load, mobility drills)  
-4️⃣ **Weekly Trend Summary** — risk trend (Improving / Stable / Worsening)  
-6️⃣ **ACL Susceptibility Score (1–100)** — rate current injury risk.  
-7.Make a brief report -> No yapping 
+1️⃣ Decide automatically whether this should be a **Daily Summary** or a **Weekly Summary**  
+   (based on injury risk, pain, recovery, and fatigue).
 
+2️⃣ **ACL Risk Level:** (Low / Moderate / High)  
+3️⃣ **2 Key Observations:** highlight pain, stiffness, or recovery patterns.  
+4️⃣ **2–3 Actionable Recommendations:** adjust training load, recovery work, or nutrition.  
+5️⃣ **Trend Summary:** improving / stable / worsening.  
+6️⃣ **ACL Susceptibility Score:** (1–100).  
+7️⃣ Generate a **brief structured report** — no unnecessary text or greetings.  
 
+---
+
+Format response with clear bullet points and concise insights suitable for a coach dashboard.
     """
     print("Prompt built successfully ✅")
     return prompt
-
 
 
 
@@ -278,11 +308,12 @@ def coach_summary_endpoint(request: CoachRequest):
                 daily=request.daily,
                 weekly=request.weekly
             )
-
+        print("Coach prompy")
         # 🔮 Call Gemini
         response = llm.invoke(prompt_text)
         summary = response.content
-
+        print("Gem process")
+        print(summary)
         # Optionally store in session history
         session["history"].append(HumanMessage(content=f"Summarize ACL for {request.player_name}"))
         session["history"].append(AIMessage(content=summary))
